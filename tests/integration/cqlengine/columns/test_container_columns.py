@@ -22,10 +22,10 @@ import cassandra.cqlengine.columns as columns
 from cassandra.cqlengine.management import sync_table, drop_table
 from tests.integration.cqlengine import is_prepend_reversed
 from tests.integration.cqlengine.base import BaseCassEngTestCase
-
+from cassandra.cqlengine import connection
+import cassandra.cqlengine
 
 class TestSetModel(Model):
-
 
     partition = columns.UUID(primary_key=True, default=uuid4)
     int_set = columns.Set(columns.Integer, required=False)
@@ -37,14 +37,16 @@ class JsonTestColumn(columns.Column):
     db_type = 'text'
 
     def to_python(self, value):
-        if value is None: return
+        if value is None:
+            return
         if isinstance(value, six.string_types):
             return json.loads(value)
         else:
             return value
 
     def to_database(self, value):
-        if value is None: return
+        if value is None:
+            return
         return json.dumps(value)
 
 
@@ -122,11 +124,18 @@ class TestSetColumn(BaseCassEngTestCase):
 
     def test_element_count_validation(self):
         """
-        Tests that big collections are detected and raise an exception.
+        Tests that big sets are detected and raise an exception.
+
+
+        @expected_result when attempting to save values larger than u_short max,
+        an exception is raised
+
+        @test_category object_mapping
         """
-        TestSetModel.create(text_set={str(uuid4()) for i in range(65535)})
+
+        TestSetModel(text_set={str(uuid4()) for i in range(65535)}).timeout(20).save()
         with self.assertRaises(ValidationError):
-            TestSetModel.create(text_set={str(uuid4()) for i in range(65536)})
+            TestSetModel(text_set={str(uuid4()) for i in range(65536)}).timeout(20).save()
 
     def test_partial_updates(self):
         """ Tests that partial udpates work as expected """
@@ -178,7 +187,6 @@ class TestSetColumn(BaseCassEngTestCase):
 
 
 class TestListModel(Model):
-
 
     partition = columns.UUID(primary_key=True, default=uuid4)
     int_list = columns.List(columns.Integer, required=False)
@@ -233,11 +241,19 @@ class TestListColumn(BaseCassEngTestCase):
 
     def test_element_count_validation(self):
         """
-        Tests that big collections are detected and raise an exception.
+        Tests that big lists are detected and raise an exception.
+
+
+        @expected_result when attempting to save values larger than u_short max,
+        an exception is raised
+
+        @test_category object_mapping
         """
-        TestListModel.create(text_list=[str(uuid4()) for i in range(65535)])
+
+        TestListModel(text_list=[str(uuid4()) for i in range(65535)]).timeout(20).save()
+
         with self.assertRaises(ValidationError):
-            TestListModel.create(text_list=[str(uuid4()) for i in range(65536)])
+            TestListModel(text_list=[str(uuid4()) for i in range(65536)]).timeout(20).save()
 
     def test_partial_updates(self):
         """ Tests that partial udpates work as expected """
@@ -285,16 +301,16 @@ class TestListColumn(BaseCassEngTestCase):
         """ tests that the default empty container is not saved if it hasn't been updated """
         pkey = uuid4()
         # create a row with list data
-        TestListModel.create(partition=pkey, int_list=[1,2,3,4])
+        TestListModel.create(partition=pkey, int_list=[1, 2, 3, 4])
         # create another with no list data
         TestListModel.create(partition=pkey)
 
         m = TestListModel.get(partition=pkey)
-        self.assertEqual(m.int_list, [1,2,3,4])
+        self.assertEqual(m.int_list, [1, 2, 3, 4])
 
     def test_remove_entry_works(self):
         pkey = uuid4()
-        tmp = TestListModel.create(partition=pkey, int_list=[1,2])
+        tmp = TestListModel.create(partition=pkey, int_list=[1, 2])
         tmp.int_list.pop()
         tmp.update()
         tmp = TestListModel.get(partition=pkey)
@@ -302,7 +318,7 @@ class TestListColumn(BaseCassEngTestCase):
 
     def test_update_from_non_empty_to_empty(self):
         pkey = uuid4()
-        tmp = TestListModel.create(partition=pkey, int_list=[1,2])
+        tmp = TestListModel.create(partition=pkey, int_list=[1, 2])
         tmp.int_list = []
         tmp.update()
 
@@ -329,8 +345,8 @@ class TestListColumn(BaseCassEngTestCase):
         m3 = TestListModel.get(partition=m.partition)
         assert m3.int_list == []
 
-class TestMapModel(Model):
 
+class TestMapModel(Model):
 
     partition = columns.UUID(primary_key=True, default=uuid4)
     int_map = columns.Map(columns.Integer, columns.UUID, required=False)
@@ -356,11 +372,11 @@ class TestMapColumn(BaseCassEngTestCase):
 
     def test_add_none_as_map_key(self):
         with self.assertRaises(ValidationError):
-            TestMapModel.create(int_map={None:1})
+            TestMapModel.create(int_map={None: 1})
 
     def test_add_none_as_map_value(self):
         with self.assertRaises(ValidationError):
-            TestMapModel.create(int_map={None:1})
+            TestMapModel.create(int_map={None: 1})
 
     def test_empty_retrieve(self):
         tmp = TestMapModel.create()
@@ -408,16 +424,23 @@ class TestMapColumn(BaseCassEngTestCase):
 
     def test_element_count_validation(self):
         """
-        Tests that big collections are detected and raise an exception.
+        Tests that big maps are detected and raise an exception
+
+
+        @expected_result when attempting to save maps larger than u_short max,
+        an exception is raised
+
+        @test_category data_types
         """
-        TestMapModel.create(text_map={str(uuid4()): i for i in range(65535)})
+
+        TestMapModel(text_map={str(uuid4()): i for i in range(65535)}).timeout(20).save()
         with self.assertRaises(ValidationError):
-            TestMapModel.create(text_map={str(uuid4()): i for i in range(65536)})
+            TestMapModel(text_map={str(uuid4()): i for i in range(65536)}).timeout(20).save()
 
     def test_partial_updates(self):
         """ Tests that partial udpates work as expected """
         now = datetime.now()
-        #derez it a bit
+        # derez it a bit
         now = datetime(*now.timetuple()[:-3])
         early = now - timedelta(minutes=30)
         earlier = early - timedelta(minutes=30)
@@ -495,7 +518,7 @@ class TestMapColumn(BaseCassEngTestCase):
         column = columns.Map(JsonTestColumn, JsonTestColumn)
         val = {1: 2, 3: 4, 5: 6}
         db_val = column.to_database(val)
-        assert db_val.value == {json.dumps(k):json.dumps(v) for k,v in val.items()}
+        assert db_val.value == {json.dumps(k): json.dumps(v) for k, v in val.items()}
         py_val = column.to_python(db_val.value)
         assert py_val == val
 
@@ -513,7 +536,6 @@ class TestMapColumn(BaseCassEngTestCase):
 
 
 class TestCamelMapModel(Model):
-
 
     partition = columns.UUID(primary_key=True, default=uuid4)
     camelMap = columns.Map(columns.Text, columns.Integer, required=False)
