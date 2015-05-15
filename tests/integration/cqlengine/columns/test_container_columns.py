@@ -130,7 +130,7 @@ class TestSetColumn(BaseCassEngTestCase):
         @expected_result when attempting to save values larger than u_short max,
         an exception is raised
 
-        @test_category object_mapping
+        @test_category data_types
         """
 
         TestSetModel(text_set={str(uuid4()) for i in range(65535)}).timeout(20).save()
@@ -247,7 +247,7 @@ class TestListColumn(BaseCassEngTestCase):
         @expected_result when attempting to save values larger than u_short max,
         an exception is raised
 
-        @test_category object_mapping
+        @test_category data_types
         """
 
         TestListModel(text_list=[str(uuid4()) for i in range(65535)]).timeout(20).save()
