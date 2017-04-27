@@ -46,7 +46,7 @@ Start-Process python -ArgumentList "-m pip install psutil pyYaml six numpy" -Wai
 
 # Clone ccm from git and use master.
 If (!(Test-Path $env:CCM_PATH)) {
-  Start-Process git -ArgumentList "clone https://github.com/pcmanus/ccm.git $($env:CCM_PATH)" -Wait -NoNewWindow
+  Start-Process git -ArgumentList "clone -b timeouts_increase https://github.com/bjmb/ccm.git $($env:CCM_PATH)" -Wait -NoNewWindow
 }
 
 
