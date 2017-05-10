@@ -398,3 +398,46 @@ class LibevConnectionTests(ConnectionTests, unittest.TestCase):
             raise unittest.SkipTest(
                 'libev does not appear to be installed properly')
         ConnectionTests.setUp(self)
+
+    def test_watchers_are_finished(self):
+        """
+        Test for asserting that watchers are closed in LibevConnection
+
+        It will open a connection to the Cluster and then abruptly clean it simulating,
+        a process termination without calling cluster.shutdown(), which would trigger
+        LibevConnection._libevloop._cleanup. Then it will check the watchers have been closed
+        Finally it will restore the LibevConnection reactor so it doesn't affect
+        the rest of the tests
+
+        @since 3.10
+        @jira_ticket PYTHON-747
+        @expected_result the watchers are closed
+
+        @test_category connection
+        """
+        cluster = Cluster(connection_class=LibevConnection)
+        session = cluster.connect(wait_for_all_pools=True)
+
+        from cassandra.io.libevreactor import _cleanup
+        import weakref
+        import copy
+
+        # conn._write_watcher and conn._read_watcher will be closed
+        # when the request is finished so this may no hit them active
+        # every time
+        session.execute_async("SELECT * FROM system.local LIMIT 1")
+        # We have to make a copy because the connections shouldn't
+        # be alive when we verify them
+        live_connections = copy.copy(LibevConnection._libevloop._live_conns)
+
+        # This simulates the process ending without cluster.shutdown()
+        # being called, then with atexit _cleanup for libevreactor would
+        # be called
+        _cleanup(weakref.ref(LibevConnection._libevloop))
+        for conn in live_connections:
+            for watcher in (conn._write_watcher, conn._read_watcher):
+                self.assertIsNone(watcher)
+
+        # Restart the reactor
+        LibevConnection._libevloop = None
+        LibevConnection.initialize_reactor()
