@@ -1,11 +1,6 @@
 language: python
 python:
   - "2.7"
-  - "3.3"
-  - "3.4"
-  - "3.5"
-  - "3.6"
-  - "pypy-5.4.1"
 
 sudo: false
 env:
@@ -24,8 +19,6 @@ install:
   - pip install tox-travis
 
 script:
-  - tox
-  - tox -e patched_loops
   - |
     changed_code_filenames=`git diff --name-only $TRAVIS_COMMIT_RANGE`
     changed_driver_filenames=`echo "$changed_code_filenames" | grep '^cassandra'`
