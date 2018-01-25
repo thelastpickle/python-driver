@@ -844,11 +844,20 @@ class LightweightTransactionTests(unittest.TestCase):
                 v int )'''
         self.session.execute(ddl)
 
+        ddl = '''
+            CREATE TABLE test3rf.lwt_clustering (
+                k int,
+                c int,
+                v int,
+                PRIMARY KEY (k, c))'''
+        self.session.execute(ddl)
+
     def tearDown(self):
         """
         Shutdown cluster
         """
         self.session.execute("DROP TABLE test3rf.lwt")
+        self.session.execute("DROP TABLE test3rf.lwt_clustering")
         self.cluster.shutdown()
 
     def test_no_connection_refused_on_timeout(self):
@@ -894,6 +903,53 @@ class LightweightTransactionTests(unittest.TestCase):
         # Make sure test passed
         self.assertTrue(received_timeout)
 
+    def test_was_applied(self):
+        batch_statement = BatchStatement(BatchType.UNLOGGED)
+        batch_statement.add_all(["INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 0, 10);",
+                                 "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 1, 10);",
+                                 "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 2, 10);"], [None] * 3)
+        result = self.session.execute(batch_statement)
+        #self.assertTrue(result.was_applied)
+
+        # Should fail since (0, 0, 10) have already been written
+        # The non conditional insert shouldn't be written as well
+        batch_statement = BatchStatement(BatchType.UNLOGGED)
+        batch_statement.add_all(["INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 0, 10) IF NOT EXISTS;",
+                                 "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 3, 10) IF NOT EXISTS;",
+                                 "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 4, 10);",
+                                 "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 5, 10) IF NOT EXISTS;"], [None] * 4)
+        result = self.session.execute(batch_statement)
+        self.assertFalse(result.was_applied)
+
+        all_rows = self.session.execute("SELECT * from test3rf.lwt_clustering")
+        # Verify the non conditional insert hasn't been inserted
+        self.assertEqual(len(all_rows.current_rows), 3)
+
+        # Should fail since (0, 0, 10) have already been written
+        batch_statement = BatchStatement(BatchType.UNLOGGED)
+        batch_statement.add_all(["INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 0, 10) IF NOT EXISTS;",
+                                 "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 3, 10) IF NOT EXISTS;",
+                                 "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 5, 10) IF NOT EXISTS;"], [None] * 3)
+        result = self.session.execute(batch_statement)
+        self.assertFalse(result.was_applied)
+
+        # Should fail since (0, 0, 10) have already been written
+        batch_statement.add("INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 0, 10) IF NOT EXISTS;")
+        result = self.session.execute(batch_statement)
+        self.assertFalse(result.was_applied)
+
+        # Should succeed
+        batch_statement = BatchStatement(BatchType.UNLOGGED)
+        batch_statement.add_all(["INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 3, 10) IF NOT EXISTS;",
+                                 "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 4, 10) IF NOT EXISTS;",
+                                 "INSERT INTO test3rf.lwt_clustering (k, c, v) VALUES (0, 5, 10) IF NOT EXISTS;"], [None] * 3)
+
+        result = self.session.execute(batch_statement)
+        self.assertTrue(result.was_applied)
+
+        all_rows = self.session.execute("SELECT * from test3rf.lwt_clustering")
+        for i, row in enumerate(all_rows):
+            self.assertEqual((0, i, 10), (row[0], row[1], row[2]))
 
 class BatchStatementDefaultRoutingKeyTests(unittest.TestCase):
     # Test for PYTHON-126: BatchStatement.add() should set the routing key of the first added prepared statement
