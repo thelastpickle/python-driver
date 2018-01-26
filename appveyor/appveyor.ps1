@@ -2,7 +2,7 @@ $env:JAVA_HOME="C:\Program Files\Java\jdk1.8.0"
 $env:PATH="$($env:JAVA_HOME)\bin;$($env:PATH)"
 $env:CCM_PATH="C:\Users\appveyor\ccm"
 $env:CASSANDRA_VERSION=$env:cassandra_version
-$env:EVENT_LOOP_MANAGER="asyncore"
+$env:EVENT_LOOP_MANAGER="asyncio"
 $env:SIMULACRON_JAR="C:\Users\appveyor\simulacron-standalone-0.7.0.jar"
 
 python --version
@@ -13,6 +13,10 @@ Start-Process cinst -ArgumentList @("-y","ant") -Wait -NoNewWindow
 If (!(Test-Path C:\ProgramData\chocolatey\bin\ant.bat)) {
   cmd /c mklink C:\ProgramData\chocolatey\bin\ant.bat C:\ProgramData\chocolatey\bin\ant.exe
 }
+
+choco install python
+python --version
+python -c "import platform; print(platform.architecture())"
 
 
 $jce_indicator = "$target\README.txt"

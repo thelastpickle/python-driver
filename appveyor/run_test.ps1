@@ -17,13 +17,19 @@ if($env:ci_type -eq 'unit'){
     echo "Running Unit tests"
     nosetests -s -v --with-ignore-docstrings --with-xunit --xunit-file=unit_results.xml .\tests\unit
 
+    $standard_unit = $lastexitcode
+
     $env:MONKEY_PATCH_LOOP=1
     nosetests -s -v --with-ignore-docstrings --with-xunit --xunit-file=unit_results.xml .\tests\unit\io\test_geventreactor.py
+    $gevent_unit = $lastexitcode
     nosetests -s -v --with-ignore-docstrings --with-xunit --xunit-file=unit_results.xml .\tests\unit\io\test_eventletreactor.py
+    $eventlet_unit = $lastexitcode
     Remove-Item $env:MONKEY_PATCH_LOOP
 
     echo "uploading unit results"
     $wc.UploadFile("https://ci.appveyor.com/api/testresults/junit/$($env:APPVEYOR_JOB_ID)", (Resolve-Path .\unit_results.xml))
+
+    $unit_tests_result = $standard_unit + $gevent_unit + $eventlet_unit
 
 }
 
