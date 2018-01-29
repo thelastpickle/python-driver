@@ -14,11 +14,6 @@ If (!(Test-Path C:\ProgramData\chocolatey\bin\ant.bat)) {
   cmd /c mklink C:\ProgramData\chocolatey\bin\ant.bat C:\ProgramData\chocolatey\bin\ant.exe
 }
 
-choco install python
-python --version
-python -c "import platform; print(platform.architecture())"
-
-
 $jce_indicator = "$target\README.txt"
 # Install Java Cryptographic Extensions, needed for SSL.
 If (!(Test-Path $jce_indicator)) {
